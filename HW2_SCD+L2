@@ -1,0 +1,205 @@
+#SGD, L2
+
+
+import numpy as np
+from sklearn import datasets
+import matplotlib.pyplot as plt
+from sklearn.linear_model import  Ridge
+%matplotlib inline
+
+#data
+data, target, coef = datasets.make_regression(n_samples = 1000, n_features = 2, n_informative = 2, n_targets = 1, 
+                                              noise = 5, coef = True, random_state = 2)
+                                              
+                                              
+#scale                                        
+means = np.mean(data, axis=0)
+stds = np.std(data, axis=0)
+for i in range(data.shape[0]):
+    for j in range(data.shape[1]):
+        data[i][j] = (data[i][j] - means[j])/stds[j]
+        
+#mse        
+def mserror(X, w, y):
+    y_pred = X.dot(w)
+    return (sum((y - y_pred)**2)) / len(y)
+    
+# Gradient Descent Function
+def gradient_descent(X, Y, w):
+    w_list = [w.copy()]
+    errors = []
+    max_iter = 15000
+    L_r = 0.0001
+    stopping_threshold = 1e-6 
+    weight_diff=np.inf 
+    iter_num = 0 
+    print(f"initial weights: {w}")
+  
+   
+    while weight_diff > stopping_threshold  and iter_num < max_iter:
+  
+        w_new = w - 2  * L_r  *np.dot(X.T, (np.dot(X,w)) - Y)/ Y.shape[0]
+ 
+        weight_diff = np.linalg.norm(w_new - w, ord=2)
+        w_list.append(w_new.copy())
+        errors.append(mserror(X, w_new, Y))
+        iter_num += 1
+        w = w_new
+    
+        if iter_num % 10 == 0:
+          print(f"Iteration {iter_num}: MSE {round(errors[-1],2)}, Weight \
+              {w}")
+    w_list = np.array(w_list)
+    
+    plt.plot(range(len(errors)), errors)
+    plt.title('MSE')
+    plt.xlabel('Iteration number')
+    plt.ylabel('MSE')
+  
+    
+    return w_list, errors
+
+w = np.zeros(2)
+w_list =  gradient_descent(data, target, w)
+
+#SGD
+def SGD(X, Y, w, L_r = 1.5, max_iter = 1e4, stopping_threshold = 1e-6):
+    w = np.zeros(2)
+    w_list = [w.copy()]
+    errors = []
+    max_iter = 1e4
+    
+    stopping_threshold = 1e-6
+    weight_diff=np.inf 
+    iter_num = 0 
+    np.random.seed(42)
+    print(f"initial weights: {w}")
+
+    while weight_diff > stopping_threshold  and iter_num < max_iter:
+      train_ind =np.random.randint(data.shape[0])
+      w_new = w - 2  * L_r * np.dot(data[train_ind].T, (np.dot(data[train_ind], w) - target[train_ind]))/ target.shape[0]
+      weight_diff = np.linalg.norm(w_new - w, ord = 2)
+      w_list.append(w_new.copy())
+      errors.append(mserror(data,w_new,target))
+      iter_num += 1
+      w = w_new
+    w_list = np.array(w_list)
+    
+    plt.plot(range(len(errors)), errors)
+    plt.title('MSE')
+    plt.xlabel('Iteration number')
+    plt.ylabel('MSE')
+    
+    print(f'В случае использования стохастического градиентного спуска функционал ошибки составляет {round(errors[-1], 4)}')
+    
+    return w_list, errors
+w = np.zeros(2)
+w_list_stoch =  SGD(data, target, w, L_r = 1.5, max_iter = 1e4, stopping_threshold = 1e-6)
+
+#visualization GD vs.SGD
+w_true = coef
+plt.figure(figsize=(13, 6))
+plt.title('Stochastic gradient descent')
+plt.xlabel(r'$w_1$')
+plt.ylabel(r'$w_2$')
+
+plt.scatter(w_list[0][:, 0], w_list[0][:, 1])
+plt.scatter(w_list_stoch[0][:, 0], w_list_stoch[0][:, 1])
+plt.scatter(w_true[0], w_true[1], c='r')
+plt.plot(w_list[0][:, 0], w_list[0][:, 1], label='Gradient Descent')
+plt.plot(w_list_stoch[0][:, 0], w_list_stoch[0][:, 1], label='Stochastic Gradient Descent')
+
+plt.show()
+
+#visualisation the different L_r
+
+plt.figure(figsize = (60,45))
+s = ['r','g','b','k','m']
+for m, L_r in zip(s, np.logspace(-2,-4, 5).tolist()):
+    
+    for i in range(5):
+
+        w = np.random.randn(2)
+        errors, w = gradient_descent(data, target, w)
+        plt.subplot(3,1,1)
+        plt.plot(errors,'--' +m)
+        plt.subplot(3,1,2)
+        plt.plot(w,'o'+m)
+    plt.subplot(3,1,1)
+    plt.plot(errors,'--'+m, label = str(L_r))
+    plt.subplot(3,1,2)
+    plt.plot(w,'o'+m, label = str(L_r))
+    plt.subplot(3,1,3)
+    plt.plot(L_r, np.mean(errors[-5:]), '*'+m)
+
+
+plt.subplot(3,1,1)
+plt.legend()
+plt.grid(True)
+plt.title('Error')
+plt.xlabel('err')
+plt.ylabel('step')
+plt.subplot(3,1,2)
+plt.legend()
+plt.grid(True)
+plt.title('W')
+plt.xlabel('W')
+plt.ylabel('step')
+plt.subplot(3,1,3)
+plt.legend()
+plt.grid(True)
+plt.title('error_mean')
+plt.xlabel('error')
+plt.ylabel('L-r')
+plt.show
+
+#SGD + L2
+def SGD_L2(X, Y, w, L_r = 1.5, max_iter = 1e4, stopping_threshold = 1e-6,alpha=0.1):
+
+    def mserror(X, w, y):
+      rd_model = Ridge(alpha=0.1)
+      rd_model.fit(X, y)
+      y_pred = rd_model.predict(X)
+      return (sum((y - y_pred)**2)) / len(y)
+
+
+    w = np.zeros(2)
+    w_list = [w.copy()]
+    errors = []
+    max_iter = 1e4
+    
+    stopping_threshold = 1e-6
+    weight_diff=np.inf 
+    iter_num = 0 
+    np.random.seed(42)
+
+
+
+    while weight_diff > stopping_threshold  and iter_num < max_iter:
+      
+
+      train_ind =np.random.randint(data.shape[0])
+
+      w_new = w - 2  * L_r *  np.dot(data[train_ind].T, (np.dot(data[train_ind], w) - target[train_ind])) / target.shape[0] 
+      weight_diff = np.linalg.norm(w_new - w, ord = 2)
+
+      w_list.append(w_new.copy())
+      errors.append(mserror(data, w_new, target))
+      iter_num += 1
+      w = w_new
+      
+    w_list = np.array(w_list)
+    
+    plt.plot(range(len(errors)), errors)
+    plt.title('MSE')
+    plt.xlabel('Iteration number')
+  
+    print(f'В случае использования стохастического градиентного спуска с добавлением L2 -регуляризации функционал ошибки составляет {round(errors[-1], 4)}')
+    return w_list, errors
+    
+    
+#visualization the differences between all errors (GD vs.SGD vs.SGD_L2)
+w = np.zeros(2)
+w_list =  gradient_descent(data, target, w)
+w_list_stoch =  SGD(data, target, w, L_r = 1.5, max_iter = 1e4, stopping_threshold = 1e-6)
+w_list_stoch_scale =  SGD_L2(data, target, w, L_r = 1.5, max_iter = 1e4, stopping_threshold = 1e-6,alpha=0.1)
