@@ -1,0 +1,149 @@
+import matplotlib.pyplot as plt
+import random
+
+from matplotlib.colors import ListedColormap
+from sklearn import datasets
+# import warnings
+# warnings.simplefilter(action='ignore', category=FutureWarning)
+
+import numpy as np
+
+
+classification_data, classification_labels = datasets.make_classification(n_features = 2, n_informative = 2, 
+                                                      n_classes = 2, n_redundant=0, 
+                                                      n_clusters_per_class=1, random_state=5)
+                                                      
+
+colors = ListedColormap(['yellow','blue'])
+light_colors = ListedColormap(['lightcoral', 'lightblue'])
+
+plt.figure(figsize=(8,8))
+plt.scatter(list(map(lambda x: x[0], classification_data)), list(map(lambda x: x[1], classification_data)), 
+              c=classification_labels, cmap=colors)
+plt.grid()
+plt.show()
+
+from sklearn import model_selection
+
+train_data, test_data, train_labels, test_labels = model_selection.train_test_split(classification_data, 
+                                                                                     classification_labels, 
+                                                                                     test_size = 0.3,
+                                                                                     random_state = 5)
+                                                                                     
+from sklearn.tree import DecisionTreeClassifier
+
+
+clf = DecisionTreeClassifier(random_state=5, max_depth = 7)
+clf.fit(train_data, train_labels)
+
+from sklearn.metrics import accuracy_score
+max_depth_values = np.arange(2, 20)
+
+accuracy_on_test = []
+accuracy_on_train = []
+
+for i, value in enumerate(max_depth_values):
+    clf = DecisionTreeClassifier(max_depth=value)
+    
+    clf.fit(train_data, train_labels)
+    
+    y_pred = clf.predict(test_data)
+    y_pred_train = clf.predict(train_data)
+        
+    acc_test= accuracy_score( test_labels , y_pred)
+    acc_train = accuracy_score(train_labels , y_pred_train)
+    
+    if i % 4 == 2:
+        print('K = {}'.format(value))
+        print('\tacc_test = {}'.format(acc_test))
+        print('\tacc_train = {}\n'.format(acc_train))
+    
+    accuracy_on_test.append(acc_test)
+    accuracy_on_train.append(acc_train)
+    
+    plt.rcParams['figure.figsize'] = 6, 4
+
+plt.plot(max_depth_values, accuracy_on_test, label="test")
+plt.plot(max_depth_values, accuracy_on_train, label="train")
+
+plt.xlabel('Значение параметра max_depth')
+plt.ylabel('Accuracy')
+
+plt.legend()
+plt.grid()
+
+plt.show()
+
+
+
+
+clf = DecisionTreeClassifier(max_depth=7
+                             )
+
+clf.fit(train_data,  train_labels)
+
+y_pred = clf.predict( test_data)
+
+accuracy_score(test_labels , y_pred)
+
+def get_meshgrid(data, step=.05, border=1.2):
+    x_min, x_max = data[:, 0].min() - border, data[:, 0].max() + border
+    y_min, y_max = data[:, 1].min() - border, data[:, 1].max() + border
+    return np.meshgrid(np.arange(x_min, x_max, step), np.arange(y_min, y_max, step))
+    
+plt.figure(figsize = (16,7))
+
+#train
+plt.subplot(1,2,1)
+xx, yy = get_meshgrid(train_data)
+mesh_predictions = np.array(clf.predict(np.c_[xx.ravel(), yy.ravel()])).reshape(xx.shape)
+plt.pcolormesh(xx, yy, mesh_predictions, cmap = light_colors)
+plt.scatter(train_data[:, 0], train_data[:, 1], c = train_labels, cmap = colors)
+plt.title(f'Train accuracy={acc_train:.2f}')
+
+# график тестовой выборки
+plt.subplot(1,2,2)
+plt.pcolormesh(xx, yy, mesh_predictions, cmap = light_colors)
+plt.scatter(test_data[:, 0], test_data[:, 1], c = test_labels, cmap = colors)
+plt.title(f'Test accuracy={acc_test:.2f}')
+
+from sklearn.model_selection import GridSearchCV
+
+parameters = {
+    'max_depth': np.arange(2, 10),
+}
+
+clf = GridSearchCV(
+    estimator=DecisionTreeClassifier(),
+    param_grid=parameters,
+    scoring='accuracy',
+    cv=5,
+)
+
+clf.fit(train_data, train_labels)
+
+clf.best_params_
+
+clf = DecisionTreeClassifier(max_depth=4)
+
+clf.fit(train_data,  train_labels)
+
+y_pred = clf.predict( test_data)
+
+accuracy_score(test_labels , y_pred)
+
+plt.figure(figsize = (16,7))
+
+#train
+plt.subplot(1,2,1)
+xx, yy = get_meshgrid(train_data)
+mesh_predictions = np.array(clf.predict(np.c_[xx.ravel(), yy.ravel()])).reshape(xx.shape)
+plt.pcolormesh(xx, yy, mesh_predictions, cmap = light_colors)
+plt.scatter(train_data[:, 0], train_data[:, 1], c = train_labels, cmap = colors)
+plt.title(f'Train accuracy={acc_train:.2f}')
+
+# график тестовой выборки
+plt.subplot(1,2,2)
+plt.pcolormesh(xx, yy, mesh_predictions, cmap = light_colors)
+plt.scatter(test_data[:, 0], test_data[:, 1], c = test_labels, cmap = colors)
+plt.title(f'Test accuracy={acc_test:.2f}')
