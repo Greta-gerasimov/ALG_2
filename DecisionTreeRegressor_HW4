@@ -1,0 +1,232 @@
+import pandas as pd 
+import numpy as np 
+from collections import Counter
+from sklearn import datasets
+from sklearn import model_selection
+import matplotlib.pyplot as plt
+
+
+class NodeRegression():
+ 
+  
+    def __init__(
+        self, 
+        Y: list,
+        X: pd.DataFrame,
+        min_samples_split=None,
+        max_depth=None,
+        depth=None,
+        node_type=None,
+        rule=None
+    ):
+        #сохранение данных в узел 
+        self.Y = Y 
+        self.X = X
+
+        #сохранение гиперпараметров
+        self.min_samples_split = min_samples_split if min_samples_split else 20
+        self.max_depth = max_depth if max_depth else 5
+
+        #текущая глубина по умолчанию 
+        self.depth = depth if depth else 0
+
+        #извлечение всех признаков
+        self.features = list(self.X.columns)
+
+        # тип узла
+        self.node_type = node_type if node_type else 'root'
+
+        #правило для сплита(?) 
+        self.rule = rule if rule else ""
+
+        # the mean of Y 
+        self.ymean = np.mean(Y)
+
+        # остатки
+        self.residuals = self.Y - self.ymean
+
+        #  the mse of the node 
+        self.mse = self.get_mse(Y, self.ymean)
+
+        # количество наблюдений в узле 
+        self.n = len(Y)
+
+        # лево/право 
+        self.left = None 
+        self.right = None 
+
+        # значения по умолчанию для сплитов
+        self.best_feature = None 
+        self.best_value = None 
+
+    @staticmethod
+    def get_mse(ytrue, yhat) -> float:
+     
+        #общее количество образцов
+        n = len(ytrue)
+
+        #остаток 
+        r = ytrue - yhat 
+
+        #? 
+        r = r ** 2
+
+        # ?
+        r = np.sum(r)
+
+        # среднее? 
+        return r / n
+
+    @staticmethod
+    def ma(x: np.array, window: int) -> np.array:
+        
+         #среднее по списку ?
+        return np.convolve(x, np.ones(window), 'valid') / window
+
+    def best_split(self) -> tuple:
+      
+        #data
+        df = self.X.copy()
+        df['Y'] = self.Y
+
+        # the  impurity for the base input 
+        mse_base = self.mse
+
+
+        # лучшая фича по умолчанию и сплит
+        best_feature = None
+        best_value = None
+
+        for feature in self.features:
+
+            # в нашем случае -это не необходимо
+            Xdf = df.dropna().sort_values(feature)
+
+            #cортировка значений и получение скользящего среднего
+            xmeans = self.ma(Xdf[feature].unique(), 2)
+
+            for value in xmeans:
+                # лево/право - y
+                left_y = Xdf[Xdf[feature]<value]['Y'].values
+                right_y = Xdf[Xdf[feature]>=value]['Y'].values
+
+                # the means 
+                left_mean = np.mean(left_y)
+                right_mean = np.mean(right_y)
+
+                # лево/право - остатки(?) 
+                res_left = left_y - left_mean 
+                res_right = right_y - right_mean
+
+                #слияние остатков(?) 
+                r = np.concatenate((res_left, res_right), axis=None)
+
+                # mse 
+                n = len(r)
+                r = r ** 2
+                r = np.sum(r)
+                mse_split = r / n
+
+                # проверка лучшего сплита в данный момент
+                if mse_split < mse_base:
+                    best_feature = feature
+                    best_value = value 
+
+                    #gain 
+                    mse_base = mse_split
+
+        return (best_feature, best_value)
+
+    def grow_tree(self):
+     
+     
+        df = self.X.copy()
+        df['Y'] = self.Y
+
+        
+        if (self.depth < self.max_depth) and (self.n >= self.min_samples_split):
+
+            # the best split 
+            best_feature, best_value = self.best_split()
+
+            if best_feature is not None:
+
+                # Saving the best split to the current node 
+                self.best_feature = best_feature
+                self.best_value = best_value
+
+                # the left and right nodes
+                left_df, right_df = df[df[best_feature]<=best_value].copy(), df[df[best_feature]>best_value].copy()
+
+                # Creating the left and right nodes
+                left = NodeRegression(
+                    left_df['Y'].values.tolist(), 
+                    left_df[self.features], 
+                    depth=self.depth + 1, 
+                    max_depth=self.max_depth, 
+                    min_samples_split=self.min_samples_split, 
+                    node_type='left_node',
+                    rule=f"{best_feature} <= {round(best_value, 3)}"
+                    )
+
+                self.left = left 
+                self.left.grow_tree()
+
+                right = NodeRegression(
+                    right_df['Y'].values.tolist(), 
+                    right_df[self.features], 
+                    depth=self.depth + 1, 
+                    max_depth=self.max_depth, 
+                    min_samples_split=self.min_samples_split,
+                    node_type='right_node',
+                    rule=f"{best_feature} > {round(best_value, 3)}"
+                    )
+
+                self.right = right
+                self.right.grow_tree()
+                   
+               
+    def print_info(self, width=4):
+        
+  
+        #пробелы
+        const = int(self.depth * width ** 1.5)
+        spaces = "-" * const
+        
+        if self.node_type == 'root':
+            print("Root")
+        else:
+            print(f"|{spaces} Split rule: {self.rule}")
+        print(f"{' ' * const}   | MSE of the node: {round(self.mse, 2)}")
+        print(f"{' ' * const}   | Count of observations in node: {self.n}")
+        print(f"{' ' * const}   | Prediction of node: {round(self.ymean, 3)}")   
+        
+    def print_tree(self):
+      
+        self.print_info() 
+        
+        if self.left is not None: 
+            self.left.print_tree()
+        
+        if self.right is not None:
+            self.right.print_tree()
+
+
+
+# making some data
+data = datasets.make_regression( n_features=2,  n_informative=2, 
+                                 n_targets=1, bias=0.0, effective_rank=None, tail_strength=0.5, noise=0.0, shuffle=True, coef=False, random_state=42)
+data = list(data)
+
+X = pd.DataFrame(data[0])
+print(X)
+
+Y = list(data[1])
+print(Y)
+
+# Initiating the Node
+root = NodeRegression(Y, X, max_depth=2, min_samples_split=3)
+# Growing the tree
+root.grow_tree()
+ 
+root.print_tree()
